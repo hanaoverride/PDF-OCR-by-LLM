@@ -5,7 +5,7 @@
 ### AI 기반 PDF 텍스트 복원 도구
 
 ![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4-green?style=flat-square&logo=openai)
-![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+![License](https://img.shields.io/badge/License-AGPL-yellow?style=flat-square)
 
 
 *이미지 형태의 PDF를 검색 가능한 텍스트 PDF로 변환하는 파이프라인*
