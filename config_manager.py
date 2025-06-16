@@ -99,19 +99,17 @@ class ConfigManager:
         return Fernet(key)
     
     def _get_or_create_salt(self):
-        """솔트 가져오기 또는 생성"""
-        if 'encryption_salt' not in self.config:
-            # 새 솔트 생성하여 저장
-            salt = os.urandom(32)
-            self.config['encryption_salt'] = base64.b64encode(salt).decode()
-            self.save_config()
-            return salt
-        else:
-            # 저장된 솔트 사용
+        """솔트 가져오기 (항상 config에서 읽기만 함)"""
+        if 'encryption_salt' in self.config:
             return base64.b64decode(self.config['encryption_salt'])
+        else:
+            return None
 
     def encrypt_api_key(self, api_key):
-        """API 키 암호화 (시스템 기반 자동 암호화)"""
+        """API 키 암호화 (환경 무관, 무작위 솔트 사용)"""
+        # 항상 새 솔트 생성
+        salt = os.urandom(32)
+        self.config['encryption_salt'] = base64.b64encode(salt).decode()
         auto_password = self._generate_auto_password()
         try:
             f = self._get_key(auto_password)
@@ -121,6 +119,15 @@ class ConfigManager:
             return True
         except Exception as e:
             print(f"API 키 암호화 오류: {e}")
+            try:
+                import tkinter as tk
+                from tkinter import messagebox
+                root = tk.Tk()
+                root.withdraw()
+                messagebox.showerror("설정 저장 오류", f"API 키 암호화/저장 중 오류 발생: {e}")
+                root.destroy()
+            except Exception:
+                pass
             return False
     
     def decrypt_api_key(self):
