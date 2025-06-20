@@ -43,7 +43,7 @@ class APIProcessor:
     def recover_text_with_api(self, raw_json, out_json, api_key, progress_callback=None, log_callback=None):
         """API를 사용해 텍스트 교정"""
         # 설정값 로드
-        batch_size = self.config.get_setting('batch_size', 5)
+        batch_size = self.config.get_setting('batch_size', 50)
         max_retries = self.config.get_setting('max_retries', 3)
         timeout_seconds = self.config.get_setting('timeout_seconds', 60)
         base_model = self.config.get_setting('base_model', 'gpt-4.1-mini')
