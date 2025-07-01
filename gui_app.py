@@ -198,8 +198,8 @@ class OCRApp:
         # 기존 위젯들 제거
         for widget in self.api_frame.winfo_children():
             widget.destroy()        # API 키 상태에 따라 UI 생성
-        if self.config_manager.has_encrypted_api_key():
-            ttk.Label(self.api_frame, text="암호화된 API 키가 저장되어 있습니다.").pack(anchor=tk.W)
+        if self.config_manager.has_api_key():
+            ttk.Label(self.api_frame, text="API 키가 저장되어 있습니다.").pack(anchor=tk.W)
             ttk.Button(self.api_frame, text="API 키 변경", command=self.change_api_key).pack(anchor=tk.W, pady=(5, 0))
         else:
             ttk.Label(self.api_frame, text="API 키가 설정되지 않았습니다.").pack(anchor=tk.W)
@@ -290,8 +290,8 @@ class OCRApp:
         dialog = APIKeyDialog(self.root, "API 키 설정")
         if dialog.result:
             api_key = dialog.result  # 이제 API 키만 받음
-            if self.config_manager.encrypt_api_key(api_key):
-                messagebox.showinfo("성공", "API 키가 자동 암호화되어 저장되었습니다.")
+            if self.config_manager.set_setting('api_key', api_key):
+                messagebox.showinfo("성공", "API 키가 저장되었습니다.")
                 self.update_api_key_ui()  # API 키 섹션만 업데이트
             else:
                 messagebox.showerror("오류", "API 키 저장에 실패했습니다.")
@@ -302,15 +302,14 @@ class OCRApp:
     
     def get_api_key(self):
         """API 키 가져오기"""
-        if not self.config_manager.has_encrypted_api_key():
+        if not self.config_manager.has_api_key():
             messagebox.showerror("오류", "API 키가 설정되지 않았습니다.")
             return None
-          # 자동 복호화 시도
-        api_key = self.config_manager.decrypt_api_key()
+        api_key = self.config_manager.get_setting('api_key')
         if api_key:
             return api_key
         else:
-            messagebox.showerror("오류", "API 키 복호화에 실패했습니다.")
+            messagebox.showerror("오류", "API 키 가져오기에 실패했습니다.")
             return None
 
     def validate_inputs(self):
@@ -340,7 +339,7 @@ class OCRApp:
                 messagebox.showerror("오류", "시작 페이지가 끝 페이지보다 클 수 없습니다.")
                 return False
         
-        if not self.config_manager.has_encrypted_api_key():
+        if not self.config_manager.has_api_key():
             messagebox.showerror("오류", "API 키를 설정해주세요.")
             return False
         
