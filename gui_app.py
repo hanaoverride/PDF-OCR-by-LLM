@@ -125,8 +125,9 @@ class OCRApp:
         )
         self.debug_check.pack(side=tk.RIGHT)
         
-        # 디버그 로그 창 (기본적으로 숨김)
+        # 디버그 로그 창
         self.debug_frame = ttk.LabelFrame(self.main_tab, text="디버그 로그", padding=10)
+        self.debug_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
         
         # 스크롤 가능한 텍스트 위젯
         log_text_frame = ttk.Frame(self.debug_frame)

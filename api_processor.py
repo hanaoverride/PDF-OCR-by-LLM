@@ -173,8 +173,16 @@ class APIProcessor:
             except:
                 pass
 
-            # 응답을 줄 단위로 나누어 각 블록에 매핑
-            texts = [line for line in resp.choices[0].message.content.split('\n') if line.strip()]
+            # 응답을 줄 단위로 나누어 각 블록에 매핑 (빈 줄도 포함)
+            texts = resp.choices[0].message.content.split('\n')
+            if len(texts) != len(chunk):
+                if log_callback:
+                    log_callback(f"[경고] 교정 결과 줄 수({len(texts)})와 원본 블록 수({len(chunk)})가 다릅니다. 빈 줄도 포함하여 매칭합니다.")
+                # 부족하면 빈 문자열로 채움, 넘치면 자름
+                if len(texts) < len(chunk):
+                    texts += [''] * (len(chunk) - len(texts))
+                else:
+                    texts = texts[:len(chunk)]
             for b, txt in zip(chunk, texts):
                 new_b = b.copy()
                 new_b['text_corrected'] = txt
