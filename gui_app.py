@@ -31,7 +31,7 @@ class OCRApp:
         self.start_page = tk.IntVar(value=1)
         self.end_page = tk.IntVar(value=1)
         self.all_pages = tk.BooleanVar(value=False)
-        self.debug_mode = tk.BooleanVar(value=False)
+        self.debug_mode = tk.BooleanVar(value=True)
         self.api_key = ""
         self.processing_cancelled = False
         
@@ -290,7 +290,7 @@ class OCRApp:
         dialog = APIKeyDialog(self.root, "API 키 설정")
         if dialog.result:
             api_key = dialog.result  # 이제 API 키만 받음
-            if self.config_manager.set_setting('api_key', api_key):
+            if self.config_manager.get_setting('api_key', api_key):
                 messagebox.showinfo("성공", "API 키가 저장되었습니다.")
                 self.update_api_key_ui()  # API 키 섹션만 업데이트
             else:
@@ -642,8 +642,7 @@ class APIKeyDialog:
         self.api_key_entry = ttk.Entry(frame, width=50, show='*')
         self.api_key_entry.grid(row=1, column=0, pady=(0, 10))
         
-        # 자동 암호화 안내문
-        info_label = ttk.Label(frame, text="※ API 키는 시스템 정보를 기반으로 자동 암호화됩니다.", 
+        info_label = ttk.Label(frame, text="※ API 키는 평문으로 저장되므로, \nconfig.json 파일을 안전하게 보관하고 \n네트워크 공격에 노출된 곳에서 사용하지 마세요.", 
                               foreground="blue", font=("", 8))
         info_label.grid(row=2, column=0, sticky=tk.W, pady=(0, 15))
         
