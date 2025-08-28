@@ -18,7 +18,7 @@ class ConfigManager:
             'daily_token_limit': 2000000,
             'max_retries': 3,
             'timeout_seconds': 60,
-            'base_model': 'gpt-4.1-mini',
+            'base_model': 'gpt-5-mini',
             'dpi': 300,
             'batch_size': 50,
             'output_folder': '',

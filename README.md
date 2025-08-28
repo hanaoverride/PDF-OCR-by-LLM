@@ -52,7 +52,7 @@ graph LR
 
 1. **PDF → 이미지 변환** (PyMuPDF)
 2. **OCR 전처리** (EasyOCR 한글·영어 지원)
-3. **AI 기반 텍스트 교정** (OpenAI GPT-4.1-mini)
+3. **AI 기반 텍스트 교정** (OpenAI gpt-5-mini)
 4. **PDF 오버레이** (PyMuPDF + ReportLab)
 
 ### 📊 결과 예시
@@ -100,7 +100,7 @@ graph LR
 ```
 
 ### 🤖 **AI 기반 교정**
-- 🧠 OpenAI GPT-4.1-mini 모델 활용
+- 🧠 OpenAI gpt-5-mini 모델 활용
 - 📦 배치 처리로 효율성 극대화
 - 🔄 자동 재시도 및 오류 처리
 - 📈 토큰 사용량 실시간 모니터링
@@ -188,7 +188,7 @@ pip install <module_name>
 
 | 모델 | 비용 | 성능 | 추천 용도 |
 |:---|:---|:---:|:---|
-| **gpt-4.1-mini** ⭐ | 💰 | ⭐⭐⭐ | 일반적인 OCR 교정 |
+| **gpt-5-mini** ⭐ | 💰 | ⭐⭐⭐ | 일반적인 OCR 교정 |
 | **gpt-4.1** | 💰💰💰 | ⭐⭐⭐⭐⭐ | 고품질 교정 필요시 |
 | **o4-mini** | 💰 | ⭐⭐⭐⭐ | 시간 여유 있을 때 |
 | **gpt-4.1-nano** | 💰 | ⭐⭐ | 초저비용 모델. 실험적 용도 |

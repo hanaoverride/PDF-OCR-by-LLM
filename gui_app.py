@@ -175,7 +175,7 @@ class OCRApp:
         ttk.Spinbox(api_settings_frame, from_=30, to=300, textvariable=self.timeout_var, width=10).grid(row=3, column=1, padx=(5, 0), pady=2)
 
         ttk.Label(api_settings_frame, text="모델명:").grid(row=4, column=0, sticky=tk.W, pady=2)
-        self.model_var = tk.StringVar(value=self.config_manager.get_setting('base_model', 'gpt-4.1-mini'))
+        self.model_var = tk.StringVar(value=self.config_manager.get_setting('base_model', 'gpt-5-mini'))
         ttk.Entry(api_settings_frame, textvariable=self.model_var, width=20).grid(row=4, column=1, padx=(5, 0), pady=2)
         
         # 출력 폴더 설정

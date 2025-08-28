@@ -46,7 +46,7 @@ class APIProcessor:
         batch_size = self.config.get_setting('batch_size', 50)
         max_retries = self.config.get_setting('max_retries', 3)
         timeout_seconds = self.config.get_setting('timeout_seconds', 60)
-        base_model = self.config.get_setting('base_model', 'gpt-4.1-mini')
+        base_model = self.config.get_setting('base_model', 'gpt-5-mini')
         
         # 토큰 사용량 로드
         usage = self.load_token_usage()
