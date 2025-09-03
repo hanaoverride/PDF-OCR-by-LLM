@@ -3,6 +3,8 @@
 OCR PDF 처리를 위한 GUI 인터페이스
 """
 import os
+import json
+import fitz  # PyMuPDF for page counting in completion checks
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, simpledialog
 import threading
@@ -413,38 +415,56 @@ class OCRApp:
         corr_json = os.path.join(output_folder, f"{base_name}_ocr_corr.json")
         output_pdf = os.path.join(output_folder, f"{base_name}_recovered.pdf")
         
-        # 1단계: OCR 전처리
+        # 1단계: OCR (완료 여부 확인 후 스킵 가능)
         if self.processing_cancelled:
             return
-            
-        self.update_progress("OCR 전처리 시작...", 10)
-        self.log_debug_message("OCR 전처리 단계 시작")
-        blocks = self.ocr_processor.preprocess_pdf(
-            input_pdf, raw_json, start_page, end_page,
-            progress_callback=lambda msg, pct: self.update_progress(msg, 10 + pct * 0.3)
-        )
-          # 2단계: API 교정
-        if self.processing_cancelled:
-            return
-            
-        self.update_progress("API 교정 시작...", 40)
-        self.log_debug_message("API 교정 단계 시작")
-        corrected_blocks = self.api_processor.recover_text_with_api(
-            raw_json, corr_json, api_key,
-            progress_callback=lambda msg, pct: self.update_progress(msg, 40 + pct * 0.4),
-            log_callback=self.log_debug_message
-        )
+
+        if self.is_ocr_complete(input_pdf, raw_json, start_page, end_page):
+            self.update_progress("기존 OCR 결과 재사용...", 15)
+            self.log_debug_message("이미 완료된 OCR 결과를 스킵합니다.")
+            with open(raw_json, 'r', encoding='utf-8') as f:
+                blocks = json.load(f)
+        else:
+            self.update_progress("OCR 전처리 시작...", 10)
+            self.log_debug_message("OCR 전처리 단계 시작")
+            blocks = self.ocr_processor.preprocess_pdf(
+                input_pdf, raw_json, start_page, end_page,
+                progress_callback=lambda msg, pct: self.update_progress(msg, 10 + pct * 0.3)
+            )
         
-        # 3단계: PDF 오버레이
+        # 2단계: API 교정 (완료 여부 확인 후 스킵 가능)
         if self.processing_cancelled:
             return
-            
-        self.update_progress("PDF 오버레이 시작...", 80)
-        self.log_debug_message("PDF 오버레이 단계 시작")
-        self.pdf_processor.overlay_with_fitz(
-            input_pdf, corrected_blocks, output_pdf,
-            progress_callback=lambda msg, pct: self.update_progress(msg, 80 + pct * 0.2)
-        )
+        if self.is_correction_complete(raw_json, corr_json):
+            self.update_progress("기존 교정 결과 재사용...", 55)
+            self.log_debug_message("이미 완료된 LLM 교정 결과를 스킵합니다.")
+            with open(corr_json, 'r', encoding='utf-8') as f:
+                corrected_blocks = json.load(f)
+        else:
+            reason = getattr(self, '_last_correction_incomplete_reason', None)
+            if reason:
+                self.log_debug_message(f"교정 재실행 사유: {reason}")
+            self.update_progress("API 교정 시작...", 40)
+            self.log_debug_message("API 교정 단계 시작")
+            corrected_blocks = self.api_processor.recover_text_with_api(
+                raw_json, corr_json, api_key,
+                progress_callback=lambda msg, pct: self.update_progress(msg, 40 + pct * 0.4),
+                log_callback=self.log_debug_message
+            )
+        
+        # 3단계: PDF 오버레이 (이미 결과 PDF가 있고 교정 결과 길이 >0 이면 스킵)
+        if self.processing_cancelled:
+            return
+        if os.path.exists(output_pdf) and corrected_blocks:
+            self.update_progress("기존 PDF 오버레이 결과 존재 - 스킵", 90)
+            self.log_debug_message("이미 생성된 PDF를 재사용합니다.")
+        else:
+            self.update_progress("PDF 오버레이 시작...", 80)
+            self.log_debug_message("PDF 오버레이 단계 시작")
+            self.pdf_processor.overlay_with_fitz(
+                input_pdf, corrected_blocks, output_pdf,
+                progress_callback=lambda msg, pct: self.update_progress(msg, 80 + pct * 0.2)
+            )
         
         self.update_progress("처리 완료!", 100)
         self.log_debug_message(f"단일 파일 처리 완료: {output_pdf}")
@@ -471,41 +491,57 @@ class OCRApp:
                 corr_json = os.path.join(output_folder, f"{base_name}_ocr_corr.json")
                 output_pdf = os.path.join(output_folder, f"{base_name}_recovered.pdf")
                 
-                # OCR 전처리 (전체 페이지)
-                self.log_debug_message(f"{base_name}: OCR 전처리 시작")
-                blocks = self.ocr_processor.preprocess_pdf(
-                    input_pdf, raw_json, None, None,  # 전체 페이지
-                    progress_callback=lambda msg, pct: self.update_progress(
-                        f"파일 {i+1}/{total_files} OCR: {base_name}", 
-                        file_progress_start + pct * 0.3 * file_progress_range / 100
+                # OCR 전처리 (전체 페이지) - 완료 시 스킵
+                if self.is_ocr_complete(input_pdf, raw_json, None, None):
+                    self.log_debug_message(f"{base_name}: 기존 OCR 결과 스킵")
+                    with open(raw_json, 'r', encoding='utf-8') as f:
+                        blocks = json.load(f)
+                else:
+                    self.log_debug_message(f"{base_name}: OCR 전처리 시작")
+                    blocks = self.ocr_processor.preprocess_pdf(
+                        input_pdf, raw_json, None, None,  # 전체 페이지
+                        progress_callback=lambda msg, pct: self.update_progress(
+                            f"파일 {i+1}/{total_files} OCR: {base_name}", 
+                            file_progress_start + pct * 0.3 * file_progress_range / 100
+                        )
                     )
-                )
                 
                 if self.processing_cancelled:
                     break
                   # API 교정
-                self.log_debug_message(f"{base_name}: API 교정 시작")
-                corrected_blocks = self.api_processor.recover_text_with_api(
-                    raw_json, corr_json, api_key,
-                    progress_callback=lambda msg, pct: self.update_progress(
-                        f"파일 {i+1}/{total_files} API: {base_name}", 
-                        file_progress_start + (0.3 + pct * 0.4) * file_progress_range / 100
-                    ),
-                    log_callback=self.log_debug_message
-                )
+                if self.is_correction_complete(raw_json, corr_json):
+                    self.log_debug_message(f"{base_name}: 기존 교정 결과 스킵")
+                    with open(corr_json, 'r', encoding='utf-8') as f:
+                        corrected_blocks = json.load(f)
+                else:
+                    reason = getattr(self, '_last_correction_incomplete_reason', None)
+                    if reason:
+                        self.log_debug_message(f"{base_name}: 교정 재실행 사유: {reason}")
+                    self.log_debug_message(f"{base_name}: API 교정 시작")
+                    corrected_blocks = self.api_processor.recover_text_with_api(
+                        raw_json, corr_json, api_key,
+                        progress_callback=lambda msg, pct: self.update_progress(
+                            f"파일 {i+1}/{total_files} API: {base_name}", 
+                            file_progress_start + (0.3 + pct * 0.4) * file_progress_range / 100
+                        ),
+                        log_callback=self.log_debug_message
+                    )
                 
                 if self.processing_cancelled:
                     break
                 
                 # PDF 오버레이
-                self.log_debug_message(f"{base_name}: PDF 오버레이 시작")
-                self.pdf_processor.overlay_with_fitz(
-                    input_pdf, corrected_blocks, output_pdf,
-                    progress_callback=lambda msg, pct: self.update_progress(
-                        f"파일 {i+1}/{total_files} PDF: {base_name}", 
-                        file_progress_start + (0.7 + pct * 0.3) * file_progress_range / 100
+                if os.path.exists(output_pdf) and corrected_blocks:
+                    self.log_debug_message(f"{base_name}: 기존 PDF 결과 스킵")
+                else:
+                    self.log_debug_message(f"{base_name}: PDF 오버레이 시작")
+                    self.pdf_processor.overlay_with_fitz(
+                        input_pdf, corrected_blocks, output_pdf,
+                        progress_callback=lambda msg, pct: self.update_progress(
+                            f"파일 {i+1}/{total_files} PDF: {base_name}", 
+                            file_progress_start + (0.7 + pct * 0.3) * file_progress_range / 100
+                        )
                     )
-                )
                 
                 completed_files.append(output_pdf)
                 self.log_debug_message(f"{base_name}: 처리 완료")
@@ -620,6 +656,72 @@ class OCRApp:
             self.log_text.see(tk.END)
             self.log_text.config(state=tk.DISABLED)
             self.root.update_idletasks()
+
+    # ====== 신규: 완료 여부 판단 유틸 ======
+    def is_ocr_complete(self, input_pdf_path, raw_json_path, start_page, end_page):
+        """이미 OCR이 완료되었는지 검사.
+        기준:
+          - raw_json 파일 존재 & 올바른 JSON (list)
+          - 요청한 페이지 범위 내 모든 페이지 번호가 최소 1회 이상 등장 (빈 페이지는 예외적으로 빠질 수 있으니 허용 옵션 필요할 수 있으나 우선 엄격)
+        """
+        try:
+            if not os.path.exists(raw_json_path):
+                return False
+            with open(raw_json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if not isinstance(data, list) or len(data) == 0:
+                return False
+            doc = fitz.open(input_pdf_path)
+            total_pages = len(doc)
+            if start_page is None and end_page is None:
+                expected_pages = set(range(1, total_pages + 1))
+            else:
+                s = start_page if start_page else 1
+                e = end_page if end_page else total_pages
+                expected_pages = set(range(s, e + 1))
+            pages_present = {b.get('page') for b in data if isinstance(b, dict) and 'page' in b}
+            missing = expected_pages - pages_present
+            # 허용: 한 페이지도 블록이 없는 경우(완전히 빈 페이지) -> 일단 기본 정책으론 미싱 페이지 있으면 미완료
+            if missing:
+                self.log_debug_message(f"OCR 재실행: 누락 페이지 {sorted(list(missing))}")
+                return False
+            return True
+        except Exception as e:
+            self.log_debug_message(f"OCR 완료 판정 오류 -> 재실행: {e}")
+            return False
+
+    def is_correction_complete(self, raw_json_path, corr_json_path):
+        """LLM 교정 완료 여부 판정.
+        기준:
+          - 두 파일 존재
+          - 두 파일 모두 list
+          - 길이 동일
+          - 모든 항목에 text_corrected 키 존재
+        """
+        try:
+            self._last_correction_incomplete_reason = None
+            if not (os.path.exists(raw_json_path) and os.path.exists(corr_json_path)):
+                self._last_correction_incomplete_reason = "결과 파일 없음"
+                return False
+            with open(raw_json_path, 'r', encoding='utf-8') as f:
+                raw_data = json.load(f)
+            with open(corr_json_path, 'r', encoding='utf-8') as f:
+                corr_data = json.load(f)
+            if not (isinstance(raw_data, list) and isinstance(corr_data, list)):
+                self._last_correction_incomplete_reason = "JSON 구조(list 아님)"
+                return False
+            if len(raw_data) == 0 or len(raw_data) != len(corr_data):
+                self._last_correction_incomplete_reason = f"길이 불일치 raw={len(raw_data)} corr={len(corr_data)}"
+                return False
+            missing_key_count = sum(1 for b in corr_data if 'text_corrected' not in b)
+            if missing_key_count:
+                self._last_correction_incomplete_reason = f"text_corrected 누락 {missing_key_count}개"
+                return False
+            return True
+        except Exception as e:
+            self.log_debug_message(f"교정 완료 판정 오류 -> 재실행: {e}")
+            self._last_correction_incomplete_reason = f"예외: {e}"
+            return False
 
 class APIKeyDialog:
     def __init__(self, parent, title):
